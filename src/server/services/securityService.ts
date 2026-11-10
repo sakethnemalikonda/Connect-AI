@@ -9,22 +9,26 @@ export class SecurityService {
     userAgent?: string;
     details?: string;
   }) {
-    const id = `SEC-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
-    const createdAt = new Date().toISOString();
+    try {
+      const id = `SEC-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+      const createdAt = new Date().toISOString();
 
-    const stmt = db.prepare(`
-      INSERT INTO security_events (id, user_id, event_type, ip_address, user_agent, details, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+      const stmt = db.prepare(`
+        INSERT INTO security_events (id, user_id, event_type, ip_address, user_agent, details, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
 
-    stmt.run(
-      id,
-      params.userId || null,
-      params.eventType,
-      params.ipAddress || null,
-      params.userAgent || null,
-      params.details || null,
-      createdAt
-    );
+      stmt.run(
+        id,
+        params.userId || null,
+        params.eventType,
+        params.ipAddress || null,
+        params.userAgent || null,
+        params.details || null,
+        createdAt
+      );
+    } catch (err) {
+      console.warn('Could not record security event:', err);
+    }
   }
 }

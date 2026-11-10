@@ -13,7 +13,12 @@ try {
   console.warn('node:sqlite is not available in this Node runtime. Using robust in-memory database store.');
 }
 
-const isVercel = Boolean(process.env.VERCEL);
+const isVercel = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.NOW_REGION
+);
 const defaultDbPath = isVercel ? '/tmp/smartgov.db' : './data/smartgov.db';
 const defaultUploadDir = isVercel ? '/tmp/uploads' : './uploads';
 
