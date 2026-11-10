@@ -1,14 +1,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { SCHEMA_SQL } from './schema.js';
-
-const requireModule = createRequire(import.meta.url);
 
 let DatabaseSyncClass: any = null;
 try {
-  const sqliteMod: any = requireModule('node:sqlite');
-  DatabaseSyncClass = sqliteMod.DatabaseSync || sqliteMod.Database;
+  let sqliteMod: any = null;
+  // In CommonJS / Vercel bundled serverless function, require exists globally
+  if (typeof require === 'function') {
+    try {
+      sqliteMod = require('node:sqlite');
+    } catch {}
+  }
+  // In Node 22+ ESM, process.getBuiltinModule is natively supported
+  if (!sqliteMod && typeof process !== 'undefined' && typeof (process as any).getBuiltinModule === 'function') {
+    try {
+      sqliteMod = (process as any).getBuiltinModule('node:sqlite');
+    } catch {}
+  }
+  if (sqliteMod) {
+    DatabaseSyncClass = sqliteMod.DatabaseSync || sqliteMod.Database;
+  }
 } catch (e) {
   console.warn('node:sqlite is not available in this Node runtime. Using robust in-memory database store.');
 }
