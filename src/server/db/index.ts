@@ -24,17 +24,11 @@ try {
   console.warn('node:sqlite is not available in this Node runtime. Using robust in-memory database store.');
 }
 
-const isVercel = Boolean(
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.AWS_LAMBDA_FUNCTION_NAME ||
-  process.env.NOW_REGION
-);
-const defaultDbPath = isVercel ? '/tmp/smartgov.db' : './data/smartgov.db';
-const defaultUploadDir = isVercel ? '/tmp/uploads' : './uploads';
+const defaultDbPath = './data/smartgov.db';
+const defaultUploadDir = './uploads';
 
-const DB_PATH = isVercel ? '/tmp/smartgov.db' : (process.env.DATABASE_PATH || defaultDbPath);
-const UPLOAD_DIR = isVercel ? '/tmp/uploads' : (process.env.UPLOAD_DIR || defaultUploadDir);
+const DB_PATH = process.env.DATABASE_PATH || defaultDbPath;
+const UPLOAD_DIR = process.env.UPLOAD_DIR || defaultUploadDir;
 
 // Ensure database and uploads directories exist
 const resolvedDbPath = path.resolve(DB_PATH);
@@ -44,18 +38,6 @@ if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   } catch {
     // Directory might already exist or handled by host
-  }
-}
-
-// On Vercel, if /tmp/smartgov.db does not exist, copy pre-seeded database if available
-if (isVercel && !fs.existsSync(resolvedDbPath)) {
-  const seedDbPath = path.resolve('./data/smartgov.db');
-  if (fs.existsSync(seedDbPath)) {
-    try {
-      fs.copyFileSync(seedDbPath, resolvedDbPath);
-    } catch (err) {
-      console.warn('Could not copy seed database to /tmp:', err);
-    }
   }
 }
 
@@ -389,15 +371,9 @@ try {
   db.exec('PRAGMA foreign_keys = ON;');
 } catch {}
 
-if (!isVercel) {
-  try {
-    db.exec('PRAGMA journal_mode = WAL;');
-  } catch {}
-} else {
-  try {
-    db.exec('PRAGMA journal_mode = MEMORY;');
-  } catch {}
-}
+try {
+  db.exec('PRAGMA journal_mode = WAL;');
+} catch {}
 
 function seedInitialDataIfEmpty() {
   try {
