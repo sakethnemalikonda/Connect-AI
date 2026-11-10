@@ -1,3 +1,5 @@
+import { handleClientFallback } from './clientFallbackStore.js';
+
 const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
 
 export class ApiError extends Error {
@@ -35,17 +37,19 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`;
 
-  let response: Response;
+  let response: Response | null = null;
   try {
     response = await fetch(url, {
       ...options,
       headers,
     });
   } catch (networkErr: any) {
-    throw new ApiError(
-      networkErr.message || 'Unable to connect to the server. Please check your internet connection.',
-      0
-    );
+    // If backend is unreachable (e.g. static Cloudflare Pages / Netlify deployment), run seamless fallback
+    try {
+      return handleClientFallback(endpoint, options) as T;
+    } catch (fallbackErr: any) {
+      throw new ApiError(fallbackErr.message || 'Connection failed', 0);
+    }
   }
 
   if (response.status === 401) {
@@ -69,12 +73,25 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   try {
     data = JSON.parse(rawText);
   } catch {
-    data = {
-      error: rawText.length < 200 && rawText.trim() ? rawText.trim() : (response.statusText || `Request failed (${response.status})`),
-    };
+    // If server returned HTML (e.g. 404 from Cloudflare Pages or 500 FUNCTION_INVOCATION_FAILED from Vercel)
+    try {
+      return handleClientFallback(endpoint, options) as T;
+    } catch (fallbackErr: any) {
+      data = {
+        error: fallbackErr.message || (rawText.length < 200 && rawText.trim() ? rawText.trim() : `Server error (${response.status})`),
+      };
+    }
   }
 
   if (!response.ok) {
+    // If server returned 500 or 404, try client-side fallback before giving up
+    if (response.status >= 500 || response.status === 404) {
+      try {
+        return handleClientFallback(endpoint, options) as T;
+      } catch (fallbackErr: any) {
+        throw new ApiError(fallbackErr.message || data.error || `A server error occurred (${response.status}).`, response.status);
+      }
+    }
     const errorMsg = data.error || data.message || `A server error occurred (${response.status}).`;
     throw new ApiError(errorMsg, response.status);
   }
